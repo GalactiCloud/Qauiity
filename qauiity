@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+
+# Copyright 2018-2020 Robert Norman (https://github.com/Spottedleaf/Tuinity/blob/master/PATCHES-LICENSE)
+
+# exit immediately if a command exits with a non-zero status
+set -e
+# get base dir regardless of execution location
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+    DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+done
+SOURCE=$([[ "$SOURCE" = /* ]] && echo "$SOURCE" || echo "$PWD/${SOURCE#./}")
+basedir=$(dirname "$SOURCE")
+. "$basedir"/scripts/init.sh
+
+tuinitystash() {
+    STASHED=$(git stash)
+}
+
+tuinityunstash() {
+    if [[ "$STASHED" != "No local changes to save" ]] ; then
+        git stash pop
+    fi
+}
+
+case "$1" in
+    "rb" | "rbp" | "rebuild")
+    (
+        set -e
+        cd "$basedir"
+        scripts/rebuildpatches.sh "$basedir"
+    )
+    ;;
+    "p" | "patch" | "apply")
+    (
+        set -e
+        cd "$basedir"
+        if [ "$2" != "fast" ]; then
+          scripts/upstream.sh
+        fi
+        scripts/apply.sh "$basedir"
+    )
+    ;;
+    "up" | "upstream")
+    (
+        cd "$basedir"
+        scripts/upstream.sh "$2"
+    )
+    ;;
+    "r" | "root")
+        cd "$basedir"
+    ;;
+    "a" | "api")
+        cd "$basedir/Qauiity-API"
+    ;;
+    "s" | "server")
+        cd "$basedir/Qauiity-Server"
+    ;;
+    "setup")
+        if [[ -f ~/.bashrc ]] ; then
+            NAME="ec"
+            if [[ ! -z "${2+x}" ]] ; then
+                NAME="$2"
+            fi
+            (grep "alias $NAME=" ~/.bashrc > /dev/null) && (sed -i "s|alias $NAME=.*|alias $NAME='. $SOURCE'|g" ~/.bashrc) || (echo "alias $NAME='. $SOURCE'" >> ~/.bashrc)
+            alias "$NAME=. $SOURCE"
+            echo "You can now just type '$NAME' at any time to access the paper tool."
+        fi
+    ;;
+esac
+
+unset -f tuinitystash
+unset -f tuinityunstash
